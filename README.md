@@ -1,10 +1,12 @@
-### 환경 설정
+### setting
 
 ```bash
 source /opt/ros/humble/setup.bash
 source $HOME/workspace/ros2/erp42_racing_ros/install/setup.bash
 source $HOME/workspace/ros2/erp42_racing_ws/install/setup.bas
 ```
+
+## execution
 
 ```bash
 ros2 launch erp42_racing_serial serial_bridge.launch.py
@@ -15,11 +17,11 @@ ros2 launch isro_p2_driver isro_p2_driver.launch.py
 ```
 
 ```bash
-ros2 run isro_p2_driver [ntrip.py](http://ntrip.py/)
+ros2 run isro_p2_driver ntrip.py
 ```
 
 
-### UTM 변환 + 점 평행이동 (/utm_tm 생성)
+### UTM + translation (/utm_tm)
 
 ```bash
 ros2 launch erp42_racing_localization ros2_lla_utm.launch.py
@@ -35,7 +37,7 @@ ros2 launch erp42_racing_localization ros2_lla_utm.launch.py
 - 첫 번째 row의 L1_UTM_X, L1_UTM_Y를 원점으로 사용
 
 
-### 전역 경로(Path) 퍼블리시
+### global path publish
 
 ```bash
 ros2 launch erp42_racing_planning waypoints.launch.py
@@ -50,7 +52,7 @@ ros2 launch erp42_racing_planning waypoints.launch.py
 
 - erp42_racing_planning/resource/fix_utm_v2.csv
 
-### Pure Pursuit 제어 노드
+### Pure Pursuit
 
 ```bash
 ros2 run erp42_racing_control pure_pursuit_node
