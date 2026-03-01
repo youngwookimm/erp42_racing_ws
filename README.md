@@ -58,3 +58,4 @@ ros2 launch erp42_racing_planning waypoints.launch.py
 ros2 run erp42_racing_control pure_pursuit_node
 ```
 
+# test
