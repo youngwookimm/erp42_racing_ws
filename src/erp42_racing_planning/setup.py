@@ -16,6 +16,7 @@ setup(
                 'resource/L1.csv',
                 'resource/R1.csv',
                 'resource/fix_utm_v2.csv',
+                'resource/fix_bag_to_planning_csv.ipynb',
             ],
         ),
         (

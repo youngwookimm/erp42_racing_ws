@@ -41,6 +41,18 @@ def generate_launch_description():
                 {'output_frame_id': 'map'},
             ],
         ),
+        Node(
+            package='erp42_racing_localization',
+            executable='vehicle_pose_viz_node.py',
+            name='vehicle_pose_viz_node',
+            output='screen',
+            parameters=[
+                {'pose_topic': '/utm_tm'},
+                {'imu_topic': '/imu/data'},
+                {'output_pose_topic': '/vehicle_pose'},
+                {'output_frame_id': 'map'},
+            ],
+        ),
         # Node(
         #     package='erp42_racing_localization',
         #     executable='csv_to_utm_pub.py',

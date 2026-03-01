@@ -47,6 +47,7 @@ install(DIRECTORY
 install(PROGRAMS
   src/csv_to_utm_pub.py
   src/utm_origin_shift_node.py
+  src/vehicle_pose_viz_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 install(DIRECTORY data

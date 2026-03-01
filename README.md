@@ -29,7 +29,9 @@ ros2 launch erp42_racing_localization ros2_lla_utm.launch.py
 
 - /fix -> lla_utm_node -> /utm
 - /utm -> utm_origin_shift_node.py -> /utm_tm (geometry_msgs/PoseStamped)
+- /utm_tm + /imu/data -> vehicle_pose_viz_node.py -> /vehicle_pose (geometry_msgs/PoseStamped)
 - /utm_tm은 pure_pursuit_node의 기본 위치 입력 토픽
+- /vehicle_pose는 rviz에서 map 기준 차량 위치 + heading 확인용 토픽
 
 현재 원점 기준:
 
@@ -57,5 +59,3 @@ ros2 launch erp42_racing_planning waypoints.launch.py
 ```bash
 ros2 run erp42_racing_control pure_pursuit_node
 ```
-
-# test
