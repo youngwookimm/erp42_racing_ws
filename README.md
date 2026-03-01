@@ -3,7 +3,7 @@
 ```bash
 source /opt/ros/humble/setup.bash
 source $HOME/workspace/ros2/erp42_racing_ros/install/setup.bash
-source $HOME/workspace/ros2/erp42_racing_ws/install/setup.bas
+source $HOME/workspace/ros2/erp42_racing_ws/install/setup.bash
 ```
 
 ## execution
