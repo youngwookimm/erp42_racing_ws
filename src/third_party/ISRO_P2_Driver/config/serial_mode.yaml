@@ -5,7 +5,7 @@ ISRO_P2_Driver_node:
     
     # Serial Config
     serial:
-      port: "/dev/ttyUSB1"
+      port: "/dev/ttyUSB0"
       baud: 921600
     
     # --- Common Configuration ---
