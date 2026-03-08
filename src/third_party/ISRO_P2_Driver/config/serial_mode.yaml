@@ -1,4 +1,4 @@
-isro_p2_driver_node:
+ISRO_P2_Driver_node:
   ros__parameters:
     # --- Connection Mode ---
     mode: "serial"

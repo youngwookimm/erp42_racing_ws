@@ -25,7 +25,6 @@ setup(
     entry_points={
         'console_scripts': [
             'pure_pursuit_node = erp42_racing_control.nodes.pure_pursuit_node:main',
-            'pure_pursuit_node_ = erp42_racing_control.nodes.pure_pursuit_node_:main',
         ],
     },
 )

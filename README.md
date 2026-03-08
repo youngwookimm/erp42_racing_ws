@@ -1,9 +1,22 @@
+### Dependencies
+```bash
+sudo apt update
+sudo apt install python3-pyqt6 libgeographic-dev
+rosdep install --rosdistro humble --from-paths src --ignore-src -r -y
+```
+
+### Build
+```bash
+colcon build --symlink-install
+source install/setup.bash
+```
+
 ### setting
 
 ```bash
 source /opt/ros/humble/setup.bash
-source $HOME/workspace/ros2/erp42_racing_ros/install/setup.bash
-source $HOME/workspace/ros2/erp42_racing_ws/install/setup.bash
+source $HOME/workspace/vil/erp42_racing_ros/install/setup.bash
+source $HOME/workspace/vil/erp42_racing_ws/install/setup.bash
 ```
 
 ## execution
@@ -13,11 +26,11 @@ ros2 launch erp42_racing_serial serial_bridge.launch.py
 ```
 
 ```bash
-ros2 launch isro_p2_driver isro_p2_driver.launch.py
+ros2 launch ISRO_P2_Driver ISRO_P2_Driver.launch.py
 ```
 
 ```bash
-ros2 run isro_p2_driver ntrip.py
+ros2 run ISRO_P2_Driver ntrip.py
 ```
 
 

@@ -22,12 +22,13 @@ class PurePursuitNode(Node):
         self.declare_parameter('Ld_max', 5.0)
         self.declare_parameter('G_v', 1.2)
         self.declare_parameter('G_k', 0.5)
-        self.declare_parameter('V_max', 5.5)
+        self.declare_parameter('V_max', 1.5)
         self.declare_parameter('V_min', 1.0)
         self.declare_parameter('G_avg', 1.48)
         self.declare_parameter('D_v_look', 10.0)
         self.declare_parameter('max_steering_deg', 20.0)
         self.declare_parameter('fallback_min_dist_threshold', 1.5)
+        self.declare_parameter('curvature_window_distance', 0.15)
 
         self.declare_parameter('path_topic', '/L1/waypoints')
         self.declare_parameter('pose_topic', '/utm_tm')
@@ -48,6 +49,9 @@ class PurePursuitNode(Node):
         self.fallback_min_dist_threshold = (
             self.get_parameter('fallback_min_dist_threshold').get_parameter_value().double_value
         )
+        self.curvature_window_distance = (
+            self.get_parameter('curvature_window_distance').get_parameter_value().double_value
+        )
         self.max_steering_rad = math.radians(self.max_steering_deg)
 
         self.path_topic = self.get_parameter('path_topic').value
@@ -65,6 +69,7 @@ class PurePursuitNode(Node):
         self.path_curvatures = []
         self.path_segment_lengths = []
         self.target_idx = 0
+        self.path_is_closed = False
 
         self.have_pose = False
         self.have_yaw = False
@@ -120,6 +125,8 @@ class PurePursuitNode(Node):
                 self.max_steering_rad = math.radians(self.max_steering_deg)
             elif param.name == 'fallback_min_dist_threshold':
                 self.fallback_min_dist_threshold = param.value
+            elif param.name == 'curvature_window_distance':
+                self.curvature_window_distance = param.value
             elif param.name == 'path_topic':
                 self.path_topic = param.value
             elif param.name == 'pose_topic':
@@ -148,29 +155,101 @@ class PurePursuitNode(Node):
         return math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y**2 + q.z**2))
 
     def calculate_path_curvatures(self):
-        step = 20
         num_waypoints = len(self.path)
         self.path_curvatures = [0.0] * num_waypoints
         self.path_segment_lengths = [0.0] * num_waypoints
 
-        if num_waypoints < 2:
+        if num_waypoints < 3:
+            return
+
+        first_point = self.path[0].pose.position
+        last_point = self.path[-1].pose.position
+        first_last_dist = math.hypot(last_point.x - first_point.x, last_point.y - first_point.y)
+        self.path_is_closed = first_last_dist < 0.5
+
+        for i in range(num_waypoints):
+            p_curr = self.path[i].pose.position
+            if i < num_waypoints - 1:
+                p_next = self.path[i + 1].pose.position
+                self.path_segment_lengths[i] = math.hypot(
+                    p_next.x - p_curr.x,
+                    p_next.y - p_curr.y,
+                )
+            elif self.path_is_closed:
+                p_next = self.path[0].pose.position
+                self.path_segment_lengths[i] = math.hypot(
+                    p_next.x - p_curr.x,
+                    p_next.y - p_curr.y,
+                )
+            else:
+                self.path_segment_lengths[i] = 0.0
+
+        total_path_length = sum(self.path_segment_lengths)
+        if total_path_length <= 1e-6:
+            return
+
+        window_distance = min(self.curvature_window_distance, total_path_length * 0.25)
+        if window_distance <= 1e-6:
             return
 
         for i in range(num_waypoints):
-            p1 = self.path[(i - step) % num_waypoints].pose.position
-            p2 = self.path[i].pose.position
-            p3 = self.path[(i + step) % num_waypoints].pose.position
+            curr = self.path[i].pose.position
+            mid_x, mid_y = self.interpolate_forward_point_along_path(i, window_distance)
+            next_x, next_y = self.interpolate_forward_point_along_path(i, 2.0 * window_distance)
 
-            v1 = (p2.x - p1.x, p2.y - p1.y)
-            v2 = (p3.x - p2.x, p3.y - p2.y)
-            angle1 = math.atan2(v1[1], v1[0])
-            angle2 = math.atan2(v2[1], v2[0])
-            d_theta = math.atan2(math.sin(angle2 - angle1), math.cos(angle2 - angle1))
-            d_dist = math.hypot(v1[0], v1[1])
-            p_next = self.path[(i + 1) % num_waypoints].pose.position
-            self.path_segment_lengths[i] = math.hypot(p_next.x - p2.x, p_next.y - p2.y)
-            if d_dist > 0.1:
-                self.path_curvatures[i] = abs(d_theta / d_dist)
+            v1_x = mid_x - curr.x
+            v1_y = mid_y - curr.y
+            v2_x = next_x - mid_x
+            v2_y = next_y - mid_y
+            v3_x = next_x - curr.x
+            v3_y = next_y - curr.y
+
+            a = math.hypot(v1_x, v1_y)
+            b = math.hypot(v2_x, v2_y)
+            c = math.hypot(v3_x, v3_y)
+            cross = abs(v1_x * v2_y - v1_y * v2_x)
+            denom = a * b * c
+
+            if denom > 1e-9:
+                self.path_curvatures[i] = 2.0 * cross / denom
+
+    def interpolate_forward_point_along_path(self, start_idx, target_distance):
+        num_waypoints = len(self.path)
+        point = self.path[start_idx].pose.position
+
+        if num_waypoints == 0 or target_distance <= 1e-9:
+            return point.x, point.y
+
+        remaining_distance = target_distance
+        current_idx = start_idx
+
+        for _ in range(num_waypoints):
+            seg_idx = current_idx
+            if seg_idx >= num_waypoints - 1 and not self.path_is_closed:
+                final_point = self.path[-1].pose.position
+                return final_point.x, final_point.y
+
+            next_idx = (seg_idx + 1) % num_waypoints
+            start_point = self.path[seg_idx].pose.position
+            end_point = self.path[next_idx].pose.position
+            seg_len = self.path_segment_lengths[seg_idx]
+            advance_idx = next_idx
+
+            if seg_len <= 1e-9:
+                current_idx = advance_idx
+                continue
+
+            if remaining_distance <= seg_len:
+                ratio = remaining_distance / seg_len
+                x = start_point.x + ratio * (end_point.x - start_point.x)
+                y = start_point.y + ratio * (end_point.y - start_point.y)
+                return x, y
+
+            remaining_distance -= seg_len
+            current_idx = advance_idx
+
+        point = self.path[current_idx].pose.position
+        return point.x, point.y
 
     def pose_callback(self, msg):
         self.current_x = msg.pose.position.x

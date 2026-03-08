@@ -12,7 +12,7 @@
 #include <sstream>
 #include <string>
 #include <cmath>
-#include "isro_p2_driver.h"
+#include "ISRO_P2_Driver.h"
 
 using namespace std::chrono_literals;
 

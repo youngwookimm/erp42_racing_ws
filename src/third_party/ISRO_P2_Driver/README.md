@@ -301,7 +301,7 @@ ros2 service call /isro_p2/reset std_srvs/srv/Trigger
 
 ```bash
 # 터미널 1: 드라이버 실행
-ros2 launch ISRO_P2_Driver ISRO_P2_Driver_launch.py mode:=serial
+ros2 launch ISRO_P2_Driver ISRO_P2_Driver.launch.py mode:=serial
 
 # 터미널 2: NTRIP 클라이언트 실행 (대화형)
 ros2 run ISRO_P2_Driver ntrip.py
