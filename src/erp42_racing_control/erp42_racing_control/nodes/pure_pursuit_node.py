@@ -4,8 +4,8 @@ import rclpy
 from geometry_msgs.msg import PoseStamped, TwistWithCovarianceStamped
 from nav_msgs.msg import Path
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import Imu
-from std_msgs.msg import Float64
 from visualization_msgs.msg import Marker
 
 from erp42_racing_msgs.msg import ControlCommand
@@ -22,15 +22,15 @@ class PurePursuitNode(Node):
         self.declare_parameter('Ld_max', 5.0)
         self.declare_parameter('G_v', 1.2)
         self.declare_parameter('G_k', 0.5)
-        self.declare_parameter('V_max', 1.5)
+        self.declare_parameter('V_max', 1.3)
         self.declare_parameter('V_min', 1.0)
         self.declare_parameter('G_avg', 1.48)
-        self.declare_parameter('D_v_look', 10.0)
+        self.declare_parameter('D_v_look', 7.0)
         self.declare_parameter('max_steering_deg', 20.0)
-        self.declare_parameter('fallback_min_dist_threshold', 1.5)
+        self.declare_parameter('fallback_min_dist_threshold', 3.0)
         self.declare_parameter('curvature_window_distance', 0.15)
 
-        self.declare_parameter('path_topic', '/L1/waypoints')
+        self.declare_parameter('path_topic', '/R1/waypoints')
         self.declare_parameter('pose_topic', '/utm_tm')
         self.declare_parameter('imu_topic', '/imu/data')
         self.declare_parameter('vel_topic', '/vel')
@@ -74,6 +74,13 @@ class PurePursuitNode(Node):
         self.have_pose = False
         self.have_yaw = False
         self.have_vel = False
+        self.debug_snapshot_valid = False
+        self.debug_target_x = 0.0
+        self.debug_target_y = 0.0
+        self.debug_virtual_lookahead_x = 0.0
+        self.debug_virtual_lookahead_y = 0.0
+        self.debug_speed_lookahead_x = 0.0
+        self.debug_speed_lookahead_y = 0.0
 
         self.mode_client = self.create_client(ModeCommand, '/erp42_racing/mode_command')
         self._init_vehicle()
@@ -81,12 +88,22 @@ class PurePursuitNode(Node):
         self.pub_cmd = self.create_publisher(ControlCommand, '/erp42_racing/control_command', 10)
         self.pub_target_marker = self.create_publisher(Marker, '/target_waypoint_marker', 10)
         self.pub_lookahead_marker = self.create_publisher(Marker, '/lookahead_waypoint_marker', 10)
-        self.pub_virtual_target_marker = self.create_publisher(Marker, '/virtual_target_point_marker', 10)
-        self.pub_kappa_tilda = self.create_publisher(Float64, '/kappa_tilda', 10)
-        self.pub_kappa = self.create_publisher(Float64, '/kappa', 10)
-        self.pub_lateral_error = self.create_publisher(Float64, '/lateral_error', 10)
+        self.pub_virtual_target_marker = self.create_publisher(
+            Marker, '/virtual_target_point_marker', 10
+        )
 
-        self.sub_path = self.create_subscription(Path, self.path_topic, self.path_callback, 10)
+        path_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+
+        self.sub_path = self.create_subscription(
+            Path,
+            self.path_topic,
+            self.path_callback,
+            path_qos,
+        )
         self.sub_pose = self.create_subscription(PoseStamped, self.pose_topic, self.pose_callback, 10)
         self.sub_imu = self.create_subscription(Imu, self.imu_topic, self.imu_callback, 10)
         self.sub_vel = self.create_subscription(
@@ -96,7 +113,8 @@ class PurePursuitNode(Node):
             10,
         )
 
-        self.timer = self.create_timer(0.02, self.control_loop)
+        self.control_timer = self.create_timer(0.02, self.control_loop)
+        self.debug_timer = self.create_timer(0.1, self.debug_publish_loop)
         self.get_logger().info(
             f'Pure Pursuit Ready: path={self.path_topic}, pose={self.pose_topic}, '
             f'imu={self.imu_topic}, vel={self.vel_topic}'
@@ -411,45 +429,26 @@ class PurePursuitNode(Node):
         self.target_idx = near_idx
         kappa_here = self.path_curvatures[near_idx]
 
-        kappa_msg = Float64()
-        kappa_msg.data = kappa_here
-        self.pub_kappa.publish(kappa_msg)
-
         dx = self.current_x - self.path[near_idx].pose.position.x
         dy = self.current_y - self.path[near_idx].pose.position.y
         lateral_error = -math.sin(self.current_yaw) * dx + math.cos(self.current_yaw) * dy
 
-        error_msg = Float64()
-        error_msg.data = lateral_error
-        self.pub_lateral_error.publish(error_msg)
-
         ld_raw = (abs(self.v_est) * self.G_v) - (kappa_here * self.G_k)
         L_d = max(self.Ld_min, min(self.Ld_max, ld_raw))
 
-        lookahead_x = self.current_x + L_d * math.cos(self.current_yaw)
-        lookahead_y = self.current_y + L_d * math.sin(self.current_yaw)
-        target_idx = self.find_closest_waypoint_to_point(
-            lookahead_x,
-            lookahead_y,
-            near_idx,
-            800,
-        )
-        tx = self.path[target_idx].pose.position.x
-        ty = self.path[target_idx].pose.position.y
+        target_idx, tx, ty = self.find_index_at_path_distance(near_idx, L_d)
+        lookahead_x = tx
+        lookahead_y = ty
 
         alpha = math.atan2(ty - self.current_y, tx - self.current_x) - self.current_yaw
         steering_rad = math.atan2(2.0 * self.L * math.sin(alpha), L_d)
         steering_rad = max(-self.max_steering_rad, min(self.max_steering_rad, steering_rad))
 
-        look_idx_look, _, _ = self.find_index_at_path_distance(
+        look_idx_look, speed_lookahead_x, speed_lookahead_y = self.find_index_at_path_distance(
             near_idx,
             self.D_v_look,
         )
         kappa_tilda = self.compute_weighted_curvature_average(near_idx, look_idx_look)
-
-        kappa_tilda_msg = Float64()
-        kappa_tilda_msg.data = kappa_tilda
-        self.pub_kappa_tilda.publish(kappa_tilda_msg)
 
         v_curv = 1.0 / (self.G_avg * (0.1 + kappa_tilda))
         v_cmd = max(self.V_min, min(self.V_max, v_curv))
@@ -461,19 +460,37 @@ class PurePursuitNode(Node):
 
         self.pub_cmd.publish(cmd)
 
-        self.publish_marker(self.pub_target_marker, tx, ty, 1.0, 0.0, 0.0, 0)
+        self.debug_target_x = tx
+        self.debug_target_y = ty
+        self.debug_virtual_lookahead_x = lookahead_x
+        self.debug_virtual_lookahead_y = lookahead_y
+        self.debug_speed_lookahead_x = speed_lookahead_x
+        self.debug_speed_lookahead_y = speed_lookahead_y
+        self.debug_snapshot_valid = True
+
+    def debug_publish_loop(self):
+        if not self.debug_snapshot_valid:
+            return
+
+        self.publish_marker(self.pub_target_marker, self.debug_target_x, self.debug_target_y, 1.0, 0.0, 0.0, 0)
         self.publish_marker(
             self.pub_virtual_target_marker,
-            lookahead_x,
-            lookahead_y,
+            self.debug_virtual_lookahead_x,
+            self.debug_virtual_lookahead_y,
             1.0,
             1.0,
             0.0,
             2,
         )
-        lx = self.path[look_idx_look].pose.position.x
-        ly = self.path[look_idx_look].pose.position.y
-        self.publish_marker(self.pub_lookahead_marker, lx, ly, 0.0, 0.0, 1.0, 1)
+        self.publish_marker(
+            self.pub_lookahead_marker,
+            self.debug_speed_lookahead_x,
+            self.debug_speed_lookahead_y,
+            0.0,
+            0.0,
+            1.0,
+            1,
+        )
 
 
 def main(args=None):

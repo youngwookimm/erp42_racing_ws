@@ -14,13 +14,6 @@ class SimpleNTRIP(Node):
         super().__init__('simple_ntrip_node')
 
         # --- 파라미터 선언 (기본값: 국토지리정보원) ---
-        # self.declare_parameter('host', 'gnss.eseoul.go.kr')
-        # self.declare_parameter('port', 2101)
-        # self.declare_parameter('mountpoint', 'YONS-RTCM32-M5')
-        # self.declare_parameter('username', 'seoul')
-        # self.declare_parameter('password', 'seoul')
-        # self.declare_parameter('interactive', True)  # 대화형 모드 여부
-
         self.declare_parameter('host', 'www.gnssdata.or.kr')
         self.declare_parameter('port', 2101)
         self.declare_parameter('mountpoint', 'SUWN-RTCM32')

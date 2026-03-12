@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(ISRO_P2_Driver)
+project(isro_p2_driver)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -18,7 +18,7 @@ find_package(std_srvs REQUIRED)
 # C Driver Library
 # ===========================================
 add_library(ISRO_P2_Driver_lib SHARED
-  src/ISRO_P2_Driver.c
+  src/isro_p2_driver.c
 )
 target_include_directories(ISRO_P2_Driver_lib PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -29,17 +29,17 @@ target_link_libraries(ISRO_P2_Driver_lib pthread)
 # ===========================================
 # ROS2 Node Executable
 # ===========================================
-add_executable(ISRO_P2_Driver_node 
-  src/ISRO_P2_Driver_node.cpp
+add_executable(isro_p2_driver_node 
+  src/isro_p2_driver_node.cpp
 )
-target_include_directories(ISRO_P2_Driver_node PUBLIC
+target_include_directories(isro_p2_driver_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
-target_link_libraries(ISRO_P2_Driver_node 
+target_link_libraries(isro_p2_driver_node 
   ISRO_P2_Driver_lib
 )
-ament_target_dependencies(ISRO_P2_Driver_node
+ament_target_dependencies(isro_p2_driver_node
   rclcpp
   sensor_msgs
   geometry_msgs
@@ -62,7 +62,7 @@ install(TARGETS ISRO_P2_Driver_lib
 )
 
 # 실행파일은 lib/${PROJECT_NAME}/에 설치 (ros2 run으로 실행)
-install(TARGETS ISRO_P2_Driver_node
+install(TARGETS isro_p2_driver_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 

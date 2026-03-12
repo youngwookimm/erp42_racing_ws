@@ -26,11 +26,11 @@ ros2 launch erp42_racing_serial serial_bridge.launch.py
 ```
 
 ```bash
-ros2 launch ISRO_P2_Driver ISRO_P2_Driver.launch.py
+ros2 launch isro_p2_driver isro_p2_driver.launch.py
 ```
 
 ```bash
-ros2 run ISRO_P2_Driver ntrip.py
+ros2 run isro_p2_driver ntrip.py
 ```
 
 

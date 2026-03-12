@@ -7,7 +7,7 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     # 패키지 경로 찾기
-    pkg_share = FindPackageShare('ISRO_P2_Driver')
+    pkg_share = FindPackageShare('isro_p2_driver')
 
     # 1. 'mode' 인자 선언 (예: serial, client, server)
     mode_arg = DeclareLaunchArgument(
@@ -27,9 +27,9 @@ def generate_launch_description():
 
     # 3. 노드 실행
     pva_node = Node(
-        package='ISRO_P2_Driver',
-        executable='ISRO_P2_Driver_node',
-        name='ISRO_P2_Driver_node',
+        package='isro_p2_driver',
+        executable='isro_p2_driver_node',
+        name='isro_p2_driver_node',
         output='screen',
         parameters=[config_file_path],
         emulate_tty=True

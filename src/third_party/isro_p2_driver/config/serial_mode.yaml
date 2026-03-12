@@ -1,11 +1,11 @@
-ISRO_P2_Driver_node:
+isro_p2_driver_node:
   ros__parameters:
     # --- Connection Mode ---
     mode: "serial"
     
     # Serial Config
     serial:
-      port: "/dev/ttyUSB0"
+      port: "/dev/ttyUSB1"
       baud: 921600
     
     # --- Common Configuration ---

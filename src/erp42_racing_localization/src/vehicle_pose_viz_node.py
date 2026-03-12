@@ -73,13 +73,13 @@ class VehiclePoseVizNode(Node):
         msg = PoseStamped()
         msg.header.stamp = stamp
         msg.header.frame_id = self.output_frame_id
-        msg.pose.position.x = self.latest_pose.pose.position.x
-        msg.pose.position.y = self.latest_pose.pose.position.y
-        msg.pose.position.z = self.latest_pose.pose.position.z
+        msg.pose.position.x = float(self.latest_pose.pose.position.x)
+        msg.pose.position.y = float(self.latest_pose.pose.position.y)
+        msg.pose.position.z = 0.0
         msg.pose.orientation = self.latest_orientation
 
         self.pose_pub.publish(msg)
-        self.publish_origin_marker(msg)
+        self.publish_origin_marker(msg)     
 
     def publish_origin_marker(self, msg):
         marker = Marker()

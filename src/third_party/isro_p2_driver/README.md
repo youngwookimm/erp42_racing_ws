@@ -1,4 +1,4 @@
-# ISRO_P2_Driver
+# isro_p2_driver
 
 PIMTP (PIM Transfer Protocol) 기반 GNSS/INS 장비 ISRO-P2/ISRO-P2-E용 ROS2 드라이버입니다.
 
@@ -76,7 +76,7 @@ git clone https://github.com/insungsys/ISRO_P2_Driver.git
 
 # 빌드
 cd ~/ros2_ws
-colcon build --packages-select ISRO_P2_Driver --symlink-install
+colcon build --packages-select isro_p2_driver --symlink-install
 
 # 환경 설정
 source install/setup.bash
@@ -85,22 +85,22 @@ source install/setup.bash
 ## 디렉토리 구조
 
 ```
-ISRO_P2_Driver/
+isro_p2_driver/
 ├── CMakeLists.txt
 ├── package.xml
 ├── README.md                    # 한글 매뉴얼
 ├── include/
-│   └── ISRO_P2_Driver.h         # C 드라이버 헤더
+│   └── isro_p2_driver.h         # C 드라이버 헤더
 ├── src/
-│   ├── ISRO_P2_Driver.c         # C 드라이버 (PIMTP 파서)
-│   └── ISRO_P2_Driver_node.cpp  # ROS2 노드
+│   ├── isro_p2_driver.c         # C 드라이버 (PIMTP 파서)
+│   └── isro_p2_driver_node.cpp  # ROS2 노드
 ├── scripts/
 │   ├── ntrip.py                 # NTRIP 클라이언트 노드
 │   ├── ISRO_P2_GUI.py           # GUI 설정 도구
 │   ├── ISRO_P2_Config.py        # CLI 설정 도구 / 핵심 라이브러리
 │   └── ssl_data.bin             # SSL 데이터 파일
 ├── launch/
-│   └── ISRO_P2_Driver.launch.py
+│   └── isro_p2_driver.launch.py
 └── config/
     ├── serial_mode.yaml
     ├── client_mode.yaml
@@ -115,9 +115,9 @@ PIM222A 장비의 설정을 업로드하는 도구입니다. GUI와 CLI 두 가�
 
 ```bash
 # 실행 권한 부여
-chmod +x ~/ros2_ws/src/ISRO_P2_Driver/scripts/ISRO_P2_GUI.py
-chmod +x ~/ros2_ws/src/ISRO_P2_Driver/scripts/ISRO_P2_Config.py
-chmod +x ~/ros2_ws/src/ISRO_P2_Driver/scripts/ntrip.py
+chmod +x ~/ros2_ws/src/isro_p2_driver/scripts/ISRO_P2_GUI.py
+chmod +x ~/ros2_ws/src/isro_p2_driver/scripts/ISRO_P2_Config.py
+chmod +x ~/ros2_ws/src/isro_p2_driver/scripts/ntrip.py
 
 # 의존성 설치 (방법 1: pip)
 pip install pyserial PyQt6
@@ -133,11 +133,11 @@ pip install pyserial PyQt6 --break-system-packages
 
 ```bash
 # 방법 1: 직접 실행
-cd ~/ros2_ws/src/ISRO_P2_Driver/scripts
+cd ~/ros2_ws/src/isro_p2_driver/scripts
 python3 ISRO_P2_GUI.py
 
 # 방법 2: ROS2 run (빌드 후)
-ros2 run ISRO_P2_Driver ISRO_P2_GUI.py
+ros2 run isro_p2_driver ISRO_P2_GUI.py
 ```
 
 **GUI 기능:**
@@ -157,11 +157,11 @@ ros2 run ISRO_P2_Driver ISRO_P2_GUI.py
 
 ```bash
 # 방법 1: 직접 실행 (config.txt 파일 생성 후 또는 내부 파라미터 직접 변경)
-cd ~/ros2_ws/src/ISRO_P2_Driver/scripts
+cd ~/ros2_ws/src/isro_p2_driver/scripts
 python3 ISRO_P2_Config.py
 
 # 방법 2: ROS2 run (빌드 후)
-ros2 run ISRO_P2_Driver ISRO_P2_Config.py
+ros2 run isro_p2_driver ISRO_P2_Config.py
 ```
 
 ### INS Rotation (RBV) 설정 가이드
@@ -191,7 +191,7 @@ ros2 run ISRO_P2_Driver ISRO_P2_Config.py
 ### Serial 모드 (기본)
 
 ```bash
-ros2 launch ISRO_P2_Driver ISRO_P2_Driver.launch.py mode:=serial
+ros2 launch isro_p2_driver isro_p2_driver.launch.py mode:=serial
 ```
 
 ### TCP Client 모드
@@ -199,7 +199,7 @@ ros2 launch ISRO_P2_Driver ISRO_P2_Driver.launch.py mode:=serial
 장비에 TCP로 접속:
 
 ```bash
-ros2 launch ISRO_P2_Driver ISRO_P2_Driver.launch.py mode:=client
+ros2 launch isro_p2_driver isro_p2_driver.launch.py mode:=client
 ```
 
 ### TCP Server 모드
@@ -207,7 +207,7 @@ ros2 launch ISRO_P2_Driver ISRO_P2_Driver.launch.py mode:=client
 장비의 접속을 대기:
 
 ```bash
-ros2 launch ISRO_P2_Driver ISRO_P2_Driver.launch.py mode:=server
+ros2 launch isro_p2_driver isro_p2_driver.launch.py mode:=server
 ```
 
 ## ROS2 설정
@@ -217,7 +217,7 @@ ros2 launch ISRO_P2_Driver ISRO_P2_Driver.launch.py mode:=server
 ### serial_mode.yaml
 
 ```yaml
-ISRO_P2_Driver_node:
+isro_p2_driver_node:
   ros__parameters:
     mode: "serial"
     serial:
@@ -233,7 +233,7 @@ ISRO_P2_Driver_node:
 ### client_mode.yaml
 
 ```yaml
-ISRO_P2_Driver_node:
+isro_p2_driver_node:
   ros__parameters:
     mode: "tcp_client"
     tcp:
@@ -249,7 +249,7 @@ ISRO_P2_Driver_node:
 ### server_mode.yaml
 
 ```yaml
-ISRO_P2_Driver_node:
+isro_p2_driver_node:
   ros__parameters:
     mode: "tcp_server"
     tcp:
@@ -301,10 +301,10 @@ ros2 service call /isro_p2/reset std_srvs/srv/Trigger
 
 ```bash
 # 터미널 1: 드라이버 실행
-ros2 launch ISRO_P2_Driver ISRO_P2_Driver.launch.py mode:=serial
+ros2 launch isro_p2_driver isro_p2_driver.launch.py mode:=serial
 
 # 터미널 2: NTRIP 클라이언트 실행 (대화형)
-ros2 run ISRO_P2_Driver ntrip.py
+ros2 run isro_p2_driver ntrip.py
 ```
 
 실행 시 대화형으로 설정을 입력받습니다:
@@ -354,7 +354,7 @@ ros2 run ISRO_P2_Driver ntrip.py
 파라미터를 모두 지정하면 대화형 입력을 건너뜁니다:
 
 ```bash
-ros2 run ISRO_P2_Driver ntrip.py --ros-args \
+ros2 run isro_p2_driver ntrip.py --ros-args \
   -p host:="rts2.ngii.go.kr" \
   -p port:=2101 \
   -p mountpoint:="VRS-RTCM32" \
@@ -613,7 +613,7 @@ ls -la /dev/ttyUSB*
 2. NMEA 발행 확인: `ros2 topic echo /nmea`
 3. 장비의 RTK 입력 설정 확인
 4. 인터넷 연결 상태 확인
-5. 권한부여 chmod +x ~/ros2_ws/src/ISRO_P2_Driver/scripts/ntrip.py
+5. 권한부여 chmod +x ~/ros2_ws/src/isro_p2_driver/scripts/ntrip.py
 
 ### Position Type이 NARROW_FLOAT에서 멈춤
 

@@ -1,4 +1,4 @@
-#include "ISRO_P2_Driver.h"
+#include "isro_p2_driver.h"
 
 #include <stdio.h>
 #include <stdlib.h>

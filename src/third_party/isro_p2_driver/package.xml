@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>ISRO_P2_Driver</name>
+  <name>isro_p2_driver</name>
   <version>1.0.0</version>
   <description>ROS2 Driver for PVA (Position, Velocity, Attitude) Data from GNSS/INS devices using PIMTP protocol</description>
   <maintainer email="jhlee@insungsys.kr">JUNG_HWAN LEE</maintainer>
@@ -17,6 +17,8 @@
   <depend>tf2</depend>
   <depend>tf2_geometry_msgs</depend>
   <depend>std_srvs</depend>
+  <exec_depend>python3-serial</exec_depend>
+  <exec_depend>python3-pyqt6</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

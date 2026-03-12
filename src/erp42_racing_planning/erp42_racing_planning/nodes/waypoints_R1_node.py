@@ -6,6 +6,7 @@ from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Path
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 
 
 class WaypointLoader(Node):
@@ -22,8 +23,13 @@ class WaypointLoader(Node):
         self.lane_prefix = self.get_parameter('lane_prefix').value
         self.origin_lane_prefix = self.get_parameter('origin_lane_prefix').value
 
-        self.pub = self.create_publisher(Path, 'waypoints', 10)
-        self.timer = self.create_timer(1.0, self.publish_path)
+        path_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.pub = self.create_publisher(Path, 'waypoints', path_qos)
+        self.publish_once_timer = None
 
         self.path = Path()
         self.path.header.frame_id = self.frame_id
@@ -31,6 +37,8 @@ class WaypointLoader(Node):
         share_directory = get_package_share_directory('erp42_racing_planning')
         csv_path = os.path.join(share_directory, 'resource', csv_name)
         self._load_waypoints(csv_path)
+
+        self.publish_once_timer = self.create_timer(0.1, self.publish_path_once)
 
     def _select_columns(self, fieldnames):
         if not fieldnames:
@@ -94,10 +102,14 @@ class WaypointLoader(Node):
         except Exception as e:
             self.get_logger().error(f'Error loading waypoints: {e}')
 
-    def publish_path(self):
+    def publish_path_once(self):
         if len(self.path.poses) > 0:
             self.path.header.stamp = self.get_clock().now().to_msg()
             self.pub.publish(self.path)
+            self.get_logger().info('Published waypoints once with TRANSIENT_LOCAL durability.')
+            self.publish_once_timer.cancel()
+            self.destroy_timer(self.publish_once_timer)
+            self.publish_once_timer = None
         else:
             self.get_logger().warn('No waypoints loaded, not publishing path.')
 
