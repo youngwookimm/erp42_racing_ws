@@ -25,9 +25,6 @@ setup(
     entry_points={
         'console_scripts': [
             'pure_pursuit_node = erp42_racing_control.nodes.pure_pursuit_node:main',
-            'step_velocity_test_node = erp42_racing_control.nodes.step_velocity_test_node:main',
-            'braking_distance_test_node = erp42_racing_control.nodes.braking_distance_test_node:main',
-            'braking_input_test_node = erp42_racing_control.nodes.braking_input_test_node:main',
         ],
     },
 )

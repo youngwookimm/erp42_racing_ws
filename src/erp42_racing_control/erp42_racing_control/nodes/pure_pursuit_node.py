@@ -19,18 +19,18 @@ class PurePursuitNode(Node):
         self.L = 1.2
 
         self.declare_parameter('Ld_min', 2.0)
-        self.declare_parameter('Ld_max', 5.0)
+        self.declare_parameter('Ld_max', 5.5)
         self.declare_parameter('G_v', 1.2)
         self.declare_parameter('G_k', 0.5)
-        self.declare_parameter('V_max', 1.3)
+        self.declare_parameter('V_max', 2.0)
         self.declare_parameter('V_min', 1.0)
         self.declare_parameter('G_avg', 1.48)
-        self.declare_parameter('D_v_look', 7.0)
+        self.declare_parameter('D_v_look', 9.0)
         self.declare_parameter('max_steering_deg', 20.0)
         self.declare_parameter('fallback_min_dist_threshold', 3.0)
         self.declare_parameter('curvature_window_distance', 0.15)
 
-        self.declare_parameter('path_topic', '/R1/waypoints')
+        self.declare_parameter('path_topic', '/L1/waypoints')
         self.declare_parameter('pose_topic', '/utm_tm')
         self.declare_parameter('imu_topic', '/imu/data')
         self.declare_parameter('vel_topic', '/vel')

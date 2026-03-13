@@ -7,6 +7,3 @@ log/
 
 .vscode/
 
-src/erp42_racing_control/README_step_velocity_test.md
-src/erp42_racing_control/README_braking_distance_test.md
-src/erp42_racing_control/README_braking_input_test.md

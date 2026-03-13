@@ -1,5 +1,5 @@
-#ifndef isro_p2_driver_H
-#define isro_p2_driver_H
+#ifndef ISRO_P2_DRIVER_H
+#define ISRO_P2_DRIVER_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -13,7 +13,7 @@ extern "C" {
 // [복구됨] 상수 및 Enum 정의
 // ---------------------------------------------------------
 
-// Time Status Values (Table 44)
+// Time Status Values (Table 44) - (GPS가 전원 켜지고 시간 맞춰지는 과정)
 typedef enum {
     GPSTIME_UNKNOWN = 20,       // Time is unknown
     GPSTIME_COARSE = 100,       // Time downloaded from GNSS, Week valid, ranges not accurate
@@ -22,20 +22,20 @@ typedef enum {
 
 // Position Type (Table 48)
 typedef enum {
-    POS_TYPE_NONE = 0,
-    POS_TYPE_SINGLE = 16,
-    POS_TYPE_PSRDIFF = 17,
-    POS_TYPE_NARROW_FLOAT = 34,
-    POS_TYPE_L1_INT = 48,
-    POS_TYPE_WIDE_INT = 49,
-    POS_TYPE_NARROW_INT = 50,   // RTK Fixed (Multi-frequency)
-    POS_TYPE_RTK_DIRECT_INS = 51,
-    POS_TYPE_INS_PSRSP = 53,
-    POS_TYPE_INS_RTKFLOAT = 55,
-    POS_TYPE_INS_RTKFIXED = 56  // INS RTK Fixed
+    POS_TYPE_NONE = 0, // 위성 신호 아예 못 잡는 상태 (터널 구간 등)
+    POS_TYPE_SINGLE = 16, // 보정 없이 위성 신호만 사용 (오차 1-2m)
+    POS_TYPE_PSRDIFF = 17, // 기준국 오차값을 받아 1m 이내로 보정한 상태
+    POS_TYPE_NARROW_FLOAT = 34, // RTK 보정 중이지만 숫자가 딱 떨어지지 않고 소수점 상태임 (오차 수십cm)
+    POS_TYPE_L1_INT = 48, // 계산이 딱 떨어져서 cm 단위로 정확한 (48,49,50) RTK FIXED
+    POS_TYPE_WIDE_INT = 49, 
+    POS_TYPE_NARROW_INT = 50, 
+    POS_TYPE_RTK_DIRECT_INS = 51, // 위성 없이 관성 센서만으로 위치 계산 중
+    POS_TYPE_INS_PSRSP = 53, // 관성 센서(INS)에 16번 (SINGLE) 데이터를 합친 상태
+    POS_TYPE_INS_RTKFLOAT = 55, // 관성 센서에 34번(FLOAT) 데이터를 합친 상태
+    POS_TYPE_INS_RTKFIXED = 56  // 정밀한 RTK와 관성 센서가 합쳐진 INS + RTK FIXED
 } POSITION_TYPE_E;
 
-// INS Status Types (Table 47) - 참고용
+// INS Status Types (Table 47) - 참고용 (INS가 정신 차리는 과정)
 typedef enum {
     INS_INACTIVE = 0,
     INS_ALIGNING = 1,
@@ -167,4 +167,4 @@ void P2_SetIMUCallback(ISRO_P2_T* device, IMU_Callback callback, void* user_data
 #ifdef __cplusplus
 }
 #endif
-#endif // isro_p2_driver_H
+#endif // ISRO_P2_DRIVER_H
