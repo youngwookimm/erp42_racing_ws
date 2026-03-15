@@ -1,3 +1,5 @@
+from glob import glob
+
 from setuptools import find_packages, setup
 
 package_name = 'erp42_racing_control'
@@ -10,6 +12,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch', glob('launch/*.launch.py')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -25,6 +28,9 @@ setup(
     entry_points={
         'console_scripts': [
             'pure_pursuit_node = erp42_racing_control.nodes.pure_pursuit_node:main',
+            'pure_pursuit_gate_node = erp42_racing_control.nodes.pure_pursuit_gate_node:main',
+            'aeb_node = erp42_racing_control.nodes.aeb_node:main',
+            'vehicle_cmd_gate_node = erp42_racing_control.nodes.vehicle_cmd_gate_node:main',
         ],
     },
 )
