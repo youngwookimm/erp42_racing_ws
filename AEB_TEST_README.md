@@ -51,7 +51,8 @@ ros2 launch velodyne velodyne-final-VLP32C-composed-launch.py
 
 ```bash
 source /home/youngwoo/workspace/vil/det_ws/install/setup.bash
-ros2 run tf2_ros static_transform_publisher -0.2 0 0.86 0 0 0 base_link velodyne
+ros2 launch localization_tf localization_tf.launch.py
+
 ```
 
 ## Terminal 8. Ground removal

@@ -3,10 +3,10 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    pure_pursuit_gate = Node(
+    pure_pursuit_global = Node(
         package='erp42_racing_control',
-        executable='pure_pursuit_gate_node',
-        name='pure_pursuit_gate_node',
+        executable='pure_pursuit_global_node',
+        name='pure_pursuit_global_node',
         output='screen',
     )
 
@@ -25,7 +25,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        pure_pursuit_gate,
+        pure_pursuit_global,
         aeb_node,
         vehicle_cmd_gate,
     ])

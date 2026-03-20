@@ -28,7 +28,7 @@ setup(
     entry_points={
         'console_scripts': [
             'pure_pursuit_node = erp42_racing_control.nodes.pure_pursuit_node:main',
-            'pure_pursuit_gate_node = erp42_racing_control.nodes.pure_pursuit_gate_node:main',
+            'pure_pursuit_global_node = erp42_racing_control.nodes.pure_pursuit_global_node:main',
             'aeb_node = erp42_racing_control.nodes.aeb_node:main',
             'vehicle_cmd_gate_node = erp42_racing_control.nodes.vehicle_cmd_gate_node:main',
         ],

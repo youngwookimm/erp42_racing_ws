@@ -9,11 +9,12 @@ from sensor_msgs.msg import Imu
 from visualization_msgs.msg import Marker
 
 from erp42_racing_msgs.msg import ControlCommand
+from erp42_racing_msgs.srv import ModeCommand
 
 
-class PurePursuitGateNode(Node):
+class PurePursuitGlobalNode(Node):
     def __init__(self):
-        super().__init__('pure_pursuit_gate_node')
+        super().__init__('pure_pursuit_global_node')
 
         self.L = 1.212
 
@@ -33,7 +34,6 @@ class PurePursuitGateNode(Node):
         self.declare_parameter('pose_topic', '/utm_tm')
         self.declare_parameter('imu_topic', '/imu/data')
         self.declare_parameter('vel_topic', '/vel')
-        self.declare_parameter('output_topic', '/vehicle_cmd_gate/pp_cmd')
 
         self.Ld_min = self.get_parameter('Ld_min').get_parameter_value().double_value
         self.Ld_max = self.get_parameter('Ld_max').get_parameter_value().double_value
@@ -58,7 +58,6 @@ class PurePursuitGateNode(Node):
         self.pose_topic = self.get_parameter('pose_topic').value
         self.imu_topic = self.get_parameter('imu_topic').value
         self.vel_topic = self.get_parameter('vel_topic').value
-        self.output_topic = self.get_parameter('output_topic').value
 
         self.add_on_set_parameters_callback(self.parameter_callback)
 
@@ -83,7 +82,10 @@ class PurePursuitGateNode(Node):
         self.debug_speed_lookahead_x = 0.0
         self.debug_speed_lookahead_y = 0.0
 
-        self.pub_cmd = self.create_publisher(ControlCommand, self.output_topic, 10)
+        self.mode_client = self.create_client(ModeCommand, '/erp42_racing/mode_command')
+        self._init_vehicle()
+
+        self.pub_cmd = self.create_publisher(ControlCommand, '/control/pp_cmd', 10)
         self.pub_target_marker = self.create_publisher(Marker, '/target_waypoint_marker', 10)
         self.pub_lookahead_marker = self.create_publisher(Marker, '/lookahead_waypoint_marker', 10)
         self.pub_virtual_target_marker = self.create_publisher(
@@ -114,8 +116,8 @@ class PurePursuitGateNode(Node):
         self.control_timer = self.create_timer(0.02, self.control_loop)
         self.debug_timer = self.create_timer(0.1, self.debug_publish_loop)
         self.get_logger().info(
-            f'Pure Pursuit Gate Ready: path={self.path_topic}, pose={self.pose_topic}, '
-            f'imu={self.imu_topic}, vel={self.vel_topic}, out={self.output_topic}'
+            f'Pure Pursuit Global Ready: path={self.path_topic}, pose={self.pose_topic}, '
+            f'imu={self.imu_topic}, vel={self.vel_topic}'
         )
 
     def parameter_callback(self, params):
@@ -151,13 +153,21 @@ class PurePursuitGateNode(Node):
                 self.imu_topic = param.value
             elif param.name == 'vel_topic':
                 self.vel_topic = param.value
-            elif param.name == 'output_topic':
-                self.output_topic = param.value
 
             self.get_logger().info(f'Parameter {param.name} updated to {param.value}')
 
         from rcl_interfaces.msg import SetParametersResult
         return SetParametersResult(successful=True)
+
+    def _init_vehicle(self):
+        while not self.mode_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Waiting for ModeCommand Service...')
+
+        req = ModeCommand.Request()
+        req.manual_mode = False
+        req.emergency_stop = False
+        req.gear = 0
+        self.mode_client.call_async(req)
 
     def get_yaw(self, q):
         return math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y**2 + q.z**2))
@@ -332,6 +342,23 @@ class PurePursuitGateNode(Node):
 
         return near_idx, min_dist
 
+    def find_closest_waypoint_to_point(self, x, y, start_idx, search_count):
+        num_waypoints = len(self.path)
+        min_dist = float('inf')
+        best_idx = start_idx
+
+        for i in range(start_idx, start_idx + min(search_count, num_waypoints)):
+            idx = i % num_waypoints
+            d = math.hypot(
+                self.path[idx].pose.position.x - x,
+                self.path[idx].pose.position.y - y,
+            )
+            if d < min_dist:
+                min_dist = d
+                best_idx = idx
+
+        return best_idx
+
     def find_index_at_path_distance(self, start_idx, target_distance):
         num_waypoints = len(self.path)
 
@@ -468,7 +495,7 @@ class PurePursuitGateNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = PurePursuitGateNode()
+    node = PurePursuitGlobalNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
