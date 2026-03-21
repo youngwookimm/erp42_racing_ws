@@ -1,11 +1,13 @@
 # waypoint_loader.py
 import csv
+import os
 from typing import List, Tuple, Optional
 
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Path
+from ament_index_python.packages import get_package_share_directory
 
 
 def _norm_key(k: str) -> str:
@@ -78,11 +80,16 @@ class WaypointLoader(Node):
     def __init__(self):
         super().__init__("waypoint_loader")
 
+        # ---- resource paths ----
+        pkg_share = get_package_share_directory("erp42_racing_planning")
+        default_road1 = os.path.join(pkg_share, "resource", "L1_sejong.csv")
+        default_road2 = os.path.join(pkg_share, "resource", "R1_sejong.csv")
+
         # ---- params (이름 통일) ----
         self.declare_parameter("frame_id", "map")
 
-        self.declare_parameter("road1_csv", "/home/youngwoo/workspace/vil/erp42_racing_ws/src/erp42_racing_planning/resource/L1_sejong.csv")
-        self.declare_parameter("road2_csv", "/home/youngwoo/workspace/vil/erp42_racing_ws/src/erp42_racing_planning/resource/R1_sejong.csv")
+        self.declare_parameter("road1_csv", default_road1)
+        self.declare_parameter("road2_csv", default_road2)
 
         self.declare_parameter("road1_topic", "/localization/right_lane")
         self.declare_parameter("road2_topic", "/localization/left_lane")
@@ -105,7 +112,8 @@ class WaypointLoader(Node):
         road2_pts = read_csv_points(road2_csv)  # overtake lane
         road1_pts = read_csv_points(road1_csv)  # reference lane
 
-        if len(road1_pts) < 2:
+        # 수정
+        if len(road2_pts) < 2:
             raise RuntimeError(f"road2 CSV has <2 points: {road2_csv}")
         if len(road1_pts) < 2:
             raise RuntimeError(f"road1 CSV has <2 points: {road1_csv}")

@@ -35,7 +35,7 @@ class SceneBuilderNode(Node):
         self.declare_parameter("scene_rear_range_s", 30.0)
 
         # lane 관련 파라미터
-        self.declare_parameter("lane_delta_d", 2.0)   # lane2 중심에서 lane1 중심까지의 d 간격
+        self.declare_parameter("lane_delta_d", 2.0)   # left 중심에서 right 중심까지의 d 간격
 
         # Internal state
         self.frame_id                                       = "map"
@@ -54,6 +54,8 @@ class SceneBuilderNode(Node):
         self.right_lane_sub         = self.create_subscription(Path, "/localization/right_lane", self._reference_path_callback, 10)
         self.left_lane_sub          = self.create_subscription(Path, "/localization/left_lane", self._overtake_path_callback, 10)
         self.ego_state_sub          = self.create_subscription(Odometry, "/perception/ego_state", self._ego_state_callback, 10)
+        #self.ego_state_sub          = self.create_subscription(Odometry, "/erp42_racing/odometry_ground_truth", self._ego_state_callback, 10)
+        
         self.obstacle_state_sub     = self.create_subscription(Track2DArray, "/perception/obstacles", self._obstacle_state_callback, 10)
 
         # Publisher 
@@ -153,13 +155,13 @@ class SceneBuilderNode(Node):
     def lane_id_from_d(self, d: float) -> int:
         lane_delta = float(self.get_parameter("lane_delta_d").value)
 
-        lane2_center = + lane_delta
-        lane1_center = 0.0
+        left_center = + lane_delta
+        right_center = 0.0
 
-        if abs(d - lane1_center) < abs(d - lane2_center):
-            return 1
-        else:
+        if abs(d - right_center) < abs(d - left_center):
             return 2
+        else:
+            return 1
         
 
 
@@ -176,27 +178,15 @@ class SceneBuilderNode(Node):
         scene_rear_range_s      = float(self.get_parameter("scene_rear_range_s").value)
 
         # ego frenet state
-        # ego_frenet_state    = ref.to_frenet(self.ego_pos)
-
-        # s_ego               = float(ego_frenet_state.s)
-        # d_ego               = float(ego_frenet_state.d)
+        x_ego,y_ego =self.ego_pos
+        ego_frenet_state    = ref.to_frenet(x_ego,y_ego )
+        s_ego               = float(ego_frenet_state.s)
+        d_ego               = float(ego_frenet_state.d)
         
-        # x, y        = self.ego_pos
-        # proj        = ref.project(x, y)
-        # vx, vy      = self.ego_vel
-        # s_dot_ego   = vx * proj.tx + vy * proj.ty
-
-        x, y = self.ego_pos
-        vx, vy = self.ego_vel
-
-        # ego Frenet state
-        ego_frenet_state = ref.to_frenet(x, y)
-        s_ego = float(ego_frenet_state.s)
-        d_ego = float(ego_frenet_state.d)
-
-        # ego longitudinal speed along reference path
-        proj = ref.project(x, y)
-        s_dot_ego = max(0.0, float(vx * proj.tx + vy * proj.ty))
+        x, y        = self.ego_pos
+        proj        = ref.project(x, y)
+        vx, vy      = self.ego_vel
+        s_dot_ego   = vx * proj.tx + vy * proj.ty
 
         self.get_logger().info(f"vx_ego={vx:.3f}, vy_ego={vy:.3f}, s_dot_ego={s_dot_ego:.3f}")
 
@@ -220,7 +210,7 @@ class SceneBuilderNode(Node):
 
             # target 속도 계산
             proj        = ref.project(obstacle.x, obstacle.y)
-            s_dot_obs   = max(0.0 ,float((obstacle.vx * proj.tx + obstacle.vy * proj.ty)))
+            s_dot_obs   = obstacle.vx * proj.tx + obstacle.vy * proj.ty
 
             # ego 기준 signed difference 비슷하게 앞/뒤 모두 포함하도록 거리 계산
             ds_forward  = ref.longitudinal_distance(s_ego, s_obs)   # ego -> obj

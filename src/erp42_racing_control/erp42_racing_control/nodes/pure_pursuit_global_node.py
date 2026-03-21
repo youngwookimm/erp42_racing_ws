@@ -9,7 +9,6 @@ from sensor_msgs.msg import Imu
 from visualization_msgs.msg import Marker
 
 from erp42_racing_msgs.msg import ControlCommand
-from erp42_racing_msgs.srv import ModeCommand
 
 
 class PurePursuitGlobalNode(Node):
@@ -82,8 +81,6 @@ class PurePursuitGlobalNode(Node):
         self.debug_speed_lookahead_x = 0.0
         self.debug_speed_lookahead_y = 0.0
 
-        self.mode_client = self.create_client(ModeCommand, '/erp42_racing/mode_command')
-        self._init_vehicle()
 
         self.pub_cmd = self.create_publisher(ControlCommand, '/control/pp_cmd', 10)
         self.pub_target_marker = self.create_publisher(Marker, '/target_waypoint_marker', 10)
@@ -158,16 +155,6 @@ class PurePursuitGlobalNode(Node):
 
         from rcl_interfaces.msg import SetParametersResult
         return SetParametersResult(successful=True)
-
-    def _init_vehicle(self):
-        while not self.mode_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Waiting for ModeCommand Service...')
-
-        req = ModeCommand.Request()
-        req.manual_mode = False
-        req.emergency_stop = False
-        req.gear = 0
-        self.mode_client.call_async(req)
 
     def get_yaw(self, q):
         return math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y**2 + q.z**2))

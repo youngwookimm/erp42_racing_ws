@@ -121,9 +121,10 @@ class AebNode(Node):
             rx = x / distance
             ry = y / distance
 
-            v_closing = vx * rx + vy * ry
+            v_closing = - (vx * rx + vy * ry)
 
-            v_closing = max(v_closing, 0.2) # 0으로 나뉘어짐 방지
+            if v_closing <= float(self.min_closing_speed_mps):
+                continue
 
             ttc = gap / v_closing
 

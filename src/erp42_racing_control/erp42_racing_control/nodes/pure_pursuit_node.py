@@ -9,7 +9,6 @@ from rclpy.node import Node
 from visualization_msgs.msg import Marker
 
 from erp42_racing_msgs.msg import ControlCommand
-from erp42_racing_msgs.srv import ModeCommand
 
 
 class PurePursuitNode(Node):
@@ -25,10 +24,6 @@ class PurePursuitNode(Node):
         self._init_state()
 
         self.add_on_set_parameters_callback(self.parameter_callback)
-
-        # ROS interfaces
-        self.mode_client = self.create_client(ModeCommand, '/erp42_racing/mode_command')
-        self._init_vehicle_mode()
 
         self._create_publishers()
         self._create_subscribers()
@@ -160,16 +155,6 @@ class PurePursuitNode(Node):
     def _create_timers(self):
         self.control_timer = self.create_timer(0.02, self.control_loop)
         self.debug_timer = self.create_timer(0.1, self.debug_publish_loop)
-
-    def _init_vehicle_mode(self):
-        while not self.mode_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Waiting for ModeCommand Service...')
-
-        req = ModeCommand.Request()
-        req.manual_mode = False
-        req.emergency_stop = False
-        req.gear = 0
-        self.mode_client.call_async(req)
 
     # =========================================================
     # Parameter callback

@@ -45,7 +45,8 @@ def generate_launch_description():
             package='erp42_racing_localization',
             executable='vehicle_pose_viz_node.py',
             name='vehicle_pose_viz_node',
-            output='screen',
+            # output='screen',
+            arguments=['--ros-args', '--log-level', 'warn'],
             parameters=[
                 {'pose_topic': '/utm_tm'},
                 {'imu_topic': '/imu/data'},

@@ -20,7 +20,7 @@ from erp42_racing_planning.core.planner_types import (
 )
 
 
-# behavior planner가 최종적으로 내리는 의사결정 결과 +x,y all obstacle  
+# behavior planner가 최종적으로 내리는 의사결정 결과 
 @dataclass
 class BehaviorDecision:
     behavior: BehaviorMode
@@ -44,22 +44,21 @@ class BehaviorPlannerNode(Node):
         # -------------------------
         # parameters
         # -------------------------
-        self.declare_parameter("scene_topic", "/planning/scene")
-        self.declare_parameter("ref_path_topic", "/planning/reference_lane")
+        self.declare_parameter("scene_topic", "/planning/behavior_scene")
+        self.declare_parameter("ref_path_topic", "/localization/right_lane")
         self.declare_parameter("behavior_mode_topic", "/planning/behavior_mode")
-        self.declare_parameter("leading_vehicle_topic", "/planning/leading_vehicle")
-        self.declare_parameter("reference_lane_id", 1) # 기본 복귀 차선은 lane1
+        self.declare_parameter("leading_vehicle_topic", "/planning/lv_frenet_state")
+        self.declare_parameter("reference_lane_id", 2) # 기본 복귀 차선
+        self.declare_parameter("overtake_lane_id", 1)
        
-        # decision thresholds
-        # 선행 차량이 이 거리 안으로 들어오면 Follow를 고려
-        self.declare_parameter("follow_distance_threshold", 30.0) 
 
         # 선행 차량이 이 거리 안이면 Overtake를 더 적극적으로 고려
-        self.declare_parameter("overtake_distance_threshold", 20.0)
+        self.declare_parameter("overtake_distance_threshold", 15.0)
 
         # TTC가 이 값 이하이면 Overtake 고려
         self.declare_parameter("ttc_overtake_threshold", 3.0)
 
+        self.declare_parameter("return_check_distance", 30.0)
 
         # lane change safety
         # target lane으로 차선 변경할 때 필요한 안전 여유
@@ -67,7 +66,7 @@ class BehaviorPlannerNode(Node):
         self.declare_parameter("lane_change_front_margin", 12.0)
         
         # 목표 차선 뒤 차량과 이 정도 이상 떨어져 있어야 안전
-        self.declare_parameter("lane_change_rear_margin", 12.0)
+        self.declare_parameter("lane_change_rear_margin", 10.0)
 
         # publish rate
         self.declare_parameter("rate_hz", 10.0)
@@ -143,30 +142,29 @@ class BehaviorPlannerNode(Node):
             self.get_logger().error(f"[behavior_planner] failed to parse scene json: {e}")
 
     # --------------------------------------------------
-    # helper : scene dict -> EgoState, ObstacleState, topology로 파싱
+    # helper : scene dict -> EgoState, ObstacleState 로 파싱
     # --------------------------------------------------
-    def parse_scene(self, scene: Dict) -> Tuple[EgoState, List[ObstacleState], Dict]:
+    def parse_scene(self, scene: Dict) -> Tuple[EgoState, List[ObstacleState]]:
         ego_raw = scene["ego"]
         ego = EgoState(
             s=float(ego_raw["s"]),
+            s_dot=float(ego_raw["s_dot"]),
             d=float(ego_raw["d"]),
-            v=float(ego_raw["v"]),
             lane_id=int(ego_raw["lane_id"]),
         )
 
-        objects: List[ObstacleState] = []
-        for obj in scene.get("objects", []):
-            objects.append(
+        obstacles : List[ObstacleState] = []
+        for obj in scene.get("obstacles", []):
+            obstacles.append(
                 ObstacleState(
                     s=float(obj["s"]),
+                    s_dot=float(obj["s_dot"]),
                     d=float(obj["d"]),
-                    v=float(obj["v"]),
                     lane_id=int(obj["lane_id"]),
                 )
             )
 
-        topology = scene.get("topology", {})
-        return ego, objects, topology
+        return ego, obstacles
 
     # --------------------------------------------------
     # helper: Frenet s 기준 전방 거리 계산
@@ -182,27 +180,17 @@ class BehaviorPlannerNode(Node):
     # --------------------------------------------------
     # helper: 같은 차선에서 가장 가까운 선행 차량 찾기
     # --------------------------------------------------
-    # 현재 ego와 같은 lane에 있는 차량 중 가장 가까운 앞차(전방 차량)를 찾는 함수
-    def find_lead_vehicle(
-        self,
-        ego: EgoState,
-        objects: List[ObstacleState]
-    ) -> Tuple[Optional[ObstacleState], float]:
-        lookahead_distance = float(self.get_parameter("follow_distance_threshold").value)
-        return self.find_lead_vehicle_in_lane(ego.s, ego.lane_id, objects, lookahead_distance)
-    
-
-    def find_lead_vehicle_in_lane(
+    def find_front_vehicle_in_lane(
         self,
         ego_s: float,
         lane_id: int,
-        objects: List[ObstacleState],
+        obstacles: List[ObstacleState],
         lookahead_distance: float = 30.0,
     ) -> Tuple[Optional[ObstacleState], float]:
         lead: Optional[ObstacleState] = None
         min_gap = float("inf")
 
-        for obj in objects:
+        for obj in obstacles:
             if obj.lane_id != lane_id:
                 continue
 
@@ -218,15 +206,45 @@ class BehaviorPlannerNode(Node):
                 lead = obj
 
         return lead, min_gap
+    
+    # --------------------------------------------------
+    # helper
+    # --------------------------------------------------
+    def find_rear_vehicle_in_lane(
+        self,
+        ego_s: float,
+        lane_id: int,
+        obstacles: List[ObstacleState],
+        lookbehind_distance: float = 30.0,
+    ) -> Tuple[Optional[ObstacleState], float]:
+        rear: Optional[ObstacleState] = None
+        min_gap = float("inf")
+
+        for obj in obstacles:
+            if obj.lane_id != lane_id:
+                continue
+
+            gap = self.forward_distance(obj.s, ego_s)
+
+            if gap <= 1e-3:
+                continue
+            if gap > lookbehind_distance:
+                continue
+
+            if gap < min_gap:
+                min_gap = gap
+                rear = obj
+
+        return rear, min_gap
 
     # --------------------------------------------------
     # helper: TTC 계산
     # --------------------------------------------------
-    def compute_ttc(self, ego_v: float, obj_v: float, gap: float) -> float:
-        rel_v = ego_v - obj_v
-        if rel_v <= 1e-3:
+    def compute_ttc(self, ego_s_dot: float, obj_s_dot: float, gap: float) -> float:
+        rel_s_dot = ego_s_dot - obj_s_dot
+        if rel_s_dot <= 1e-3:
             return float("inf")
-        return gap / rel_v
+        return gap / rel_s_dot
 
     # --------------------------------------------------
     # helper: overtake safety check
@@ -235,14 +253,14 @@ class BehaviorPlannerNode(Node):
     def is_overtake_safe(
         self,
         ego: EgoState,
-        objects: List[ObstacleState],
+        obstacles: List[ObstacleState],
         target_lane: int,
     ) -> bool:
 
         front_margin = float(self.get_parameter("lane_change_front_margin").value)
         rear_margin = float(self.get_parameter("lane_change_rear_margin").value)
 
-        for obj in objects:
+        for obj in obstacles:
             if obj.lane_id != target_lane:
                 continue
 
@@ -258,26 +276,6 @@ class BehaviorPlannerNode(Node):
                 return False
 
         return True
-    # --------------------------------------------------
-    # helper: 추월할 수 있는 차선 후보를 찾는 역할
-    # left_of  = {"0":2, "2":1, "1":null}
-    # right_of = {"0":null, "2":0, "1":2}
-    # --------------------------------------------------
-    def get_candidate_overtake_lanes(self, ego_lane: int, topology: Dict) -> List[int]:
-        candidates: List[int] = []
-
-        left_of = topology.get("left_of", {})
-        right_of = topology.get("right_of", {})
-
-        left_lane = left_of.get(str(ego_lane), None)
-        right_lane = right_of.get(str(ego_lane), None)
-
-        if left_lane is not None:
-            candidates.append(int(left_lane))
-        if right_lane is not None:
-            candidates.append(int(right_lane))
-
-        return candidates
 
     # --------------------------------------------------
     # helper: 현재 ego s가 추월 금지 구간인지 확인
@@ -300,161 +298,158 @@ class BehaviorPlannerNode(Node):
 
         return False
     
-    # --------------------------------------------------
-    # helper: 추월을 금지하는 s 구간을 포함되는지를 확인
-    # --------------------------------------------------
-    def get_current_no_overtake_zone(self, s_ego: float) -> Optional[Tuple[float, float]]:
-        zones = list(self.get_parameter("no_overtake_zones").value)
-        if len(zones) % 2 != 0:
-            return None
 
-        for i in range(0, len(zones), 2):
-            s_start = float(zones[i])
-            s_end = float(zones[i + 1])
-            if s_start <= s_ego <= s_end:
-                return (s_start, s_end)
-
-        return None
-
-    # --------------------------------------------------
-    # behavior decision 로직
-    # --------------------------------------------------
-    def decide_behavior(self, ego, objects, topology):
-
-        # -----------------------------
+    def decide_behavior(
+        self,
+        ego: EgoState,
+        obstacles: List[ObstacleState],
+    ) -> BehaviorDecision:
+        
         # parameters
-        # -----------------------------
         overtake_distance = float(self.get_parameter("overtake_distance_threshold").value)
         overtake_ttc_threshold = float(self.get_parameter("ttc_overtake_threshold").value)
         reference_lane = int(self.get_parameter("reference_lane_id").value)
-        follow_distance = float(self.get_parameter("follow_distance_threshold").value)
-        
-        # -----------------------------
-        # lead vehicle detection
-        # -----------------------------
-        lead_vehicle, gap = self.find_lead_vehicle(ego, objects)
+        overtake_lane = int(self.get_parameter("overtake_lane_id").value)
+        return_check_distance = float(self.get_parameter("return_check_distance").value)
+        return_front_margin = float(self.get_parameter("lane_change_front_margin").value)
+        return_rear_margin = float(self.get_parameter("lane_change_rear_margin").value)
 
-        ttc = float("inf")
-        if lead_vehicle is not None:
-            ttc = self.compute_ttc(ego.v, lead_vehicle.v, gap)
-
-        # --------------------------------------------------
-        # 0. 추월 차선에 올라간 뒤, 기준 차선(lane2) 앞에 아직 장애물이 남아 있으면 OVERTAKE 유지
-        # --------------------------------------------------
-        is_on_overtake_lane = (ego.lane_id != reference_lane)
-
-        ref_lead_vehicle, ref_gap = self.find_lead_vehicle_in_lane(
+        # 0) 현재 차선 lead vehicle 찾기
+        lead_vehicle, gap = self.find_front_vehicle_in_lane(
             ego_s=ego.s,
             lane_id=reference_lane,
-            objects=objects,
-            lookahead_distance=30.0,
+            obstacles=obstacles,
+            lookahead_distance=return_check_distance,
         )
+            
+        ttc = float("inf")
+        if lead_vehicle is not None:
+            ttc = self.compute_ttc(ego.s_dot, lead_vehicle.s_dot, gap)
         
-        keep_overtake_distance = 20.0
-
-        if is_on_overtake_lane and ref_lead_vehicle is not None and ref_gap < keep_overtake_distance:
-            return BehaviorDecision(
-                behavior=BehaviorMode.OVERTAKE,
-                gap=ref_gap,
-                ttc=9999.0,
-                reason="OVERTAKE: obstacles still ahead on reference lane",
-                has_lead=True,
-                lead_s=ref_lead_vehicle.s,
-                lead_v=ref_lead_vehicle.v
-            )
-
-        # -----------------------------
-        # 1. no lead vehicle
-        # -----------------------------
-        if lead_vehicle is None:
-
-            return BehaviorDecision(
-                behavior=BehaviorMode.CRUISE,
-                gap=float("inf"),
-                ttc=float("inf"),
-                reason="CRUISE: no lead vehicle",
-                has_lead=False,
-                lead_s=0.0,
-                lead_v=0.0
-            )
-
-        # -----------------------------
-        # 1.5 lead vehicle exists but far enough
-        # -----------------------------
-        if gap > follow_distance:
-            return BehaviorDecision(
-                behavior=BehaviorMode.CRUISE,
-                gap=gap,
-                ttc=ttc,
-                reason="CRUISE: lead vehicle is far enough",
-                has_lead=True,
-                lead_s=lead_vehicle.s,
-                lead_v=lead_vehicle.v
-            )
-        # -----------------------------
-        # 2. no-overtake zone
-        # -----------------------------
-        elif self.is_no_overtake_zone(ego.s):
-
-            return BehaviorDecision(
-                behavior=BehaviorMode.FOLLOW,
-                gap=gap,
-                ttc=ttc,
-                reason="FOLLOW: no-overtake zone",
-                has_lead=True,
-                lead_s=lead_vehicle.s,
-                lead_v=lead_vehicle.v
-            )
-
-        # -----------------------------
-        # 3. lead vehicle close
-        # -----------------------------
-        lead_close = (gap < overtake_distance or ttc < overtake_ttc_threshold)
-
-        if lead_close:
-
-            candidate_lanes = self.get_candidate_overtake_lanes(ego.lane_id, topology)
-
-            for lane in candidate_lanes:
-
-                lane_safe = self.is_overtake_safe(ego, objects, lane)
-
-                if lane_safe:
-
-
+        # ==================================================
+        # 1) 추월 금지 구간
+        #    - 앞차 있으면 FOLLOW
+        #    - 앞차 없으면 CRUISE
+        # ==================================================
+        # if self.is_no_overtake_zone(ego.s):
+        #     if lead_vehicle is not None:
+        #         return BehaviorDecision(
+        #             behavior=BehaviorMode.FOLLOW,
+        #             gap=gap,
+        #             ttc=ttc,
+        #             reason="FOLLOW: no-overtake zone with leading vehicle",
+        #             has_lead=True,
+        #             lead_s=lead_vehicle.s,
+        #             lead_v=lead_vehicle.s_dot,
+        #         )
+        #     else:
+        #         return BehaviorDecision(
+        #             behavior=BehaviorMode.CRUISE,
+        #             gap=float("inf"),
+        #             ttc=float("inf"),
+        #             reason="CRUISE: no-overtake zone and no leading vehicle",
+        #             has_lead=False,
+        #             lead_s=0.0,
+        #             lead_v=0.0,
+        #         )
+        # ==================================================
+        # 2) 추월 가능 구간 + ego가 기준 차선(reference lane)에 있음
+        #    - 앞차 없으면 CRUISE
+        #    - 앞차 있으면 TTC / 거리 기준으로 OVERTAKE or FOLLOW
+        # ==================================================
+        if ego.lane_id == reference_lane:
+            if lead_vehicle is None:
+                return BehaviorDecision(
+                    behavior=BehaviorMode.CRUISE,
+                    gap=float("inf"),
+                    ttc=float("inf"),
+                    reason="CRUISE: on reference lane and no leading vehicle",
+                    has_lead=False,
+                    lead_s=0.0,
+                    lead_v=0.0,
+                )
+            lead_close = (gap < overtake_distance) or (ttc < overtake_ttc_threshold)
+            
+            if lead_close:
+                if self.is_overtake_safe(ego,obstacles, overtake_lane):
                     return BehaviorDecision(
                         behavior=BehaviorMode.OVERTAKE,
                         gap=gap,
                         ttc=ttc,
-                        reason="OVERTAKE: adjacent lane safe",
+                        reason=f"OVERTAKE: move to lane {overtake_lane}",
                         has_lead=True,
                         lead_s=lead_vehicle.s,
-                        lead_v=lead_vehicle.v
+                        lead_v=lead_vehicle.s_dot,
+                    )
+                else:
+                    return BehaviorDecision(
+                        behavior=BehaviorMode.FOLLOW,
+                        gap=gap,
+                        ttc=ttc,
+                        reason="FOLLOW: overtake lane not safe",
+                        has_lead=True,
+                        lead_s=lead_vehicle.s,
+                        lead_v=lead_vehicle.s_dot,
                     )
 
             return BehaviorDecision(
                 behavior=BehaviorMode.FOLLOW,
                 gap=gap,
                 ttc=ttc,
-                reason="FOLLOW: lead vehicle close but lane change unsafe",
+                reason="FOLLOW: keep distance on reference lane",
                 has_lead=True,
                 lead_s=lead_vehicle.s,
-                lead_v=lead_vehicle.v
+                lead_v=lead_vehicle.s_dot,
+            )
+        # ==================================================
+        # 3) 추월 가능 구간 + ego가 추월 차선(overtake lane)에 있음
+        #    - reference lane 앞/뒤가 비어 있으면 CRUISE(복귀)
+        #    - 아니면 OVERTAKE 유지
+        # ==================================================
+        else: 
+            ref_front_vehicle, ref_front_gap = self.find_front_vehicle_in_lane(
+                ego_s=ego.s,
+                lane_id=reference_lane,
+                obstacles=obstacles,
+                lookahead_distance=return_check_distance,
+            )
+            
+            ref_rear_vehicle, ref_rear_gap = self.find_rear_vehicle_in_lane(
+                ego_s=ego.s,
+                lane_id=reference_lane,
+                obstacles=obstacles,
+                lookbehind_distance=return_check_distance,
+            )
+            
+            ref_front_clear = (
+                ref_front_vehicle is None or ref_front_gap >= return_front_margin
+            )
+            ref_rear_clear = (
+                ref_rear_vehicle is None or ref_rear_gap >= return_rear_margin
             )
 
-        # -----------------------------
-        # 4. default follow
-        # -----------------------------
-        else:
+            if ref_front_clear and ref_rear_clear :
+                return BehaviorDecision(
+                    behavior=BehaviorMode.CRUISE,
+                    gap=ref_front_gap if ref_front_vehicle is not None else float("inf"),
+                    ttc=float("inf"),
+                    reason=f"CRUISE: return to reference lane {reference_lane}",
+                    has_lead=False,
+                    lead_s=0.0,
+                    lead_v=0.0,
+                )
+
             return BehaviorDecision(
-                behavior=BehaviorMode.FOLLOW,
-                gap=gap,
-                ttc=ttc,
-                reason="FOLLOW: maintaining safe distance",
-                has_lead=True,
-                lead_s=lead_vehicle.s,
-                lead_v=lead_vehicle.v
+                behavior=BehaviorMode.OVERTAKE,
+                gap=ref_front_gap if ref_front_vehicle is not None else float("inf"),
+                ttc=float("inf"),
+                reason=f"OVERTAKE: keep lane {overtake_lane}, reference lane blocked",
+                has_lead=False,
+                lead_s=0.0,
+                lead_v=0.0,
             )
+
+
     # --------------------------------------------------
     # timer
     # --------------------------------------------------
@@ -463,8 +458,8 @@ class BehaviorPlannerNode(Node):
             return
 
         try:
-            ego, objects, topology = self.parse_scene(self.latest_scene)
-            decision = self.decide_behavior(ego, objects, topology)
+            ego, obstacles = self.parse_scene(self.latest_scene)
+            decision = self.decide_behavior(ego, obstacles)
             self.last_decision = decision
 
 
