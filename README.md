@@ -28,6 +28,13 @@ ros2 launch erp42_racing_serial serial_bridge.launch.py
 ```bash
 ros2 launch erp42_racing_bringup localization.launch.py
 ```
+```bash
+ros2 launch obstacle_tracking perception_pipeline.launch.py
+```
+
+```bash
+ros2 launch velodyne velodyne-final-VLP32C-composed-launch.py
+```
 
 ```bash
 ros2 launch erp42_racing_planning planning.launch.py
@@ -44,3 +51,4 @@ ros2 run erp42_racing_control pure_pursuit_node
 ```bash
 ros2 run erp42_racing_control vehicle_cmd_gate_node
 ```
+

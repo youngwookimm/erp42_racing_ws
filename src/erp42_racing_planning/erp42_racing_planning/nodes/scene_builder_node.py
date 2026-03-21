@@ -186,7 +186,7 @@ class SceneBuilderNode(Node):
         x, y        = self.ego_pos
         proj        = ref.project(x, y)
         vx, vy      = self.ego_vel
-        s_dot_ego   = vx * proj.tx + vy * proj.ty
+        s_dot_ego   = max(0.0, vx * proj.tx + vy * proj.ty)
 
         self.get_logger().info(f"vx_ego={vx:.3f}, vy_ego={vy:.3f}, s_dot_ego={s_dot_ego:.3f}")
 
@@ -210,7 +210,7 @@ class SceneBuilderNode(Node):
 
             # target 속도 계산
             proj        = ref.project(obstacle.x, obstacle.y)
-            s_dot_obs   = obstacle.vx * proj.tx + obstacle.vy * proj.ty
+            s_dot_obs   = max(0.0, obstacle.vx * proj.tx + obstacle.vy * proj.ty)
 
             # ego 기준 signed difference 비슷하게 앞/뒤 모두 포함하도록 거리 계산
             ds_forward  = ref.longitudinal_distance(s_ego, s_obs)   # ego -> obj
